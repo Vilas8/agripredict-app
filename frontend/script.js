@@ -149,6 +149,215 @@ let storedPredictionValues = {};
 let storedSearchValues = {};
 let currentPredictionData = { commodity: null, district: null, market: null, currentPrice: null, predictedPrice: null };
 
+// ---- Dropdown Toggles ----
+function toggleLoginDropdown() {
+  const dropdown = document.getElementById('login-dropdown');
+  if (dropdown) dropdown.classList.toggle('hidden');
+  // Close when clicking outside
+  document.addEventListener('click', function closeDropdown(e) {
+    const dropdown = document.getElementById('login-dropdown');
+    const btn = document.querySelector('button[onclick="toggleLoginDropdown()"]');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+        dropdown.classList.add('hidden');
+        document.removeEventListener('click', closeDropdown);
+      }
+    }
+  });
+}
+
+function toggleAboutUsLoginDropdown() {
+  const dropdown = document.getElementById('about-us-login-dropdown');
+  if (dropdown) dropdown.classList.toggle('hidden');
+  document.addEventListener('click', function closeDropdown(e) {
+    const dropdown = document.getElementById('about-us-login-dropdown');
+    const btn = document.querySelector('button[onclick="toggleAboutUsLoginDropdown()"]');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+        dropdown.classList.add('hidden');
+        document.removeEventListener('click', closeDropdown);
+      }
+    }
+  });
+}
+
+// ---- Notifications (Home Page Price Alerts) ----
+function updateNotifications() {
+  const container = document.getElementById('home-notification-scroll');
+  const dateEl = document.getElementById('notification-date');
+  if (!container) return;
+  if (dateEl) {
+    const today = new Date();
+    dateEl.textContent = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  }
+  const prices = getAllCurrentPrices();
+  const alerts = [
+    { emoji: '🌽', name: 'Maize', price: prices['Maize'], trend: '↑ +2.3%' },
+    { emoji: '🌾', name: 'Paddy', price: prices['Paddy'], trend: '→ Stable' },
+    { emoji: '🌿', name: 'Wheat', price: prices['Wheat'], trend: '↑ +1.8%' },
+    { emoji: '🎋', name: 'Sugarcane', price: prices['Sugarcane'], trend: '↓ -0.5%' },
+    { emoji: '🌽', name: 'Maize', price: prices['Maize'], trend: 'Kolar APMC' },
+    { emoji: '🌾', name: 'Paddy', price: prices['Paddy'], trend: 'Chintamani' },
+    { emoji: '🌿', name: 'Wheat', price: prices['Wheat'], trend: 'Hoskote APMC' },
+    { emoji: '🎋', name: 'Sugarcane', price: prices['Sugarcane'], trend: 'Malur Main' }
+  ];
+  const html = alerts.map(a => `
+    <div class="flex items-center justify-between p-2 bg-white bg-opacity-10 rounded-xl">
+      <span class="text-white text-sm">${a.emoji} ${a.name}</span>
+      <div class="text-right">
+        <span class="text-emerald-200 text-xs font-bold">₹${a.price.toLocaleString()}</span>
+        <span class="text-emerald-300 text-xs block">${a.trend}</span>
+      </div>
+    </div>`).join('');
+  // Duplicate for seamless scroll loop
+  container.innerHTML = html + html;
+}
+
+// ---- Markets Available Count ----
+function updateMarketsAvailableCount() {
+  const el = document.getElementById('user-markets-available');
+  if (el) {
+    let count = 0;
+    for (const district of Object.keys(marketsByDistrict)) {
+      count += marketsByDistrict[district].length;
+    }
+    el.textContent = count;
+  }
+}
+
+// ---- Password Visibility Toggle ----
+function togglePasswordVisibility(inputId, eyeId) {
+  const input = document.getElementById(inputId);
+  const eye = document.getElementById(eyeId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eye) eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    if (eye) eye.textContent = '👁️';
+  }
+}
+
+// ---- Password Strength Meter ----
+function updatePasswordStrength(value) {
+  const bar = document.getElementById('pw-strength-bar');
+  const label = document.getElementById('pw-strength-label');
+  const reqLen = document.getElementById('req-len');
+  const reqUpper = document.getElementById('req-upper');
+  const reqLower = document.getElementById('req-lower');
+  const reqDigit = document.getElementById('req-digit');
+  const reqSym = document.getElementById('req-sym');
+
+  const hasLen = value.length >= 8;
+  const hasUpper = /[A-Z]/.test(value);
+  const hasLower = /[a-z]/.test(value);
+  const hasDigit = /[0-9]/.test(value);
+  const hasSym = /[!@#$%^&*(),.?":{}|<>]/.test(value);
+
+  const mark = (el, met) => {
+    if (!el) return;
+    el.className = met ? 'met' : 'unmet';
+    el.textContent = el.textContent.replace(/^[✓✗] /, (met ? '✓ ' : '✗ '));
+  };
+  mark(reqLen, hasLen);
+  mark(reqUpper, hasUpper);
+  mark(reqLower, hasLower);
+  mark(reqDigit, hasDigit);
+  mark(reqSym, hasSym);
+
+  const score = [hasLen, hasUpper, hasLower, hasDigit, hasSym].filter(Boolean).length;
+  const configs = [
+    { width: '0%', color: '#e5e7eb', text: '', textColor: '' },
+    { width: '20%', color: '#ef4444', text: 'Very Weak', textColor: '#ef4444' },
+    { width: '40%', color: '#f97316', text: 'Weak', textColor: '#f97316' },
+    { width: '60%', color: '#eab308', text: 'Fair', textColor: '#eab308' },
+    { width: '80%', color: '#22c55e', text: 'Strong', textColor: '#22c55e' },
+    { width: '100%', color: '#10b981', text: 'Very Strong', textColor: '#10b981' }
+  ];
+  const cfg = configs[score];
+  if (bar) { bar.style.width = cfg.width; bar.style.background = cfg.color; }
+  if (label) { label.textContent = cfg.text; label.style.color = cfg.textColor; }
+}
+
+// ---- Email Validation ----
+function validateRegEmail() {
+  const emailInput = document.getElementById('reg-email');
+  const hint = document.getElementById('reg-email-hint');
+  if (!emailInput || !hint) return;
+  const val = emailInput.value.trim();
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  hint.classList.remove('hidden');
+  if (!val) { hint.textContent = ''; hint.classList.add('hidden'); return; }
+  if (valid) {
+    hint.textContent = '✓ Valid email address';
+    hint.className = 'text-xs mt-1 text-emerald-600';
+  } else {
+    hint.textContent = '✗ Please enter a valid email (e.g. name@gmail.com)';
+    hint.className = 'text-xs mt-1 text-red-500';
+  }
+}
+
+// ---- Complaint Submit (About Us Page) ----
+async function handleComplaintSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('complaint-name')?.value?.trim();
+  const email = document.getElementById('complaint-email')?.value?.trim();
+  const commodity = document.getElementById('complaint-commodity')?.value;
+  const message = document.getElementById('complaint-message')?.value?.trim();
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+
+  if (!name || !email || !commodity || !message) {
+    showToast('Please fill in all required fields', '⚠️');
+    return;
+  }
+
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
+
+  const complaintData = {
+    type: 'remark',
+    complaint_type: 'complaint',
+    username: name,
+    email: email,
+    commodity: commodity,
+    remark: message,
+    district: 'N/A',
+    market: 'N/A',
+    created_at: new Date().toISOString(),
+    sync_id: Date.now()
+  };
+
+  // Save locally first
+  try {
+    const pending = JSON.parse(localStorage.getItem('pendingcomplaints') || '[]');
+    pending.unshift(complaintData);
+    localStorage.setItem('pendingcomplaints', JSON.stringify(pending));
+    showToast('Complaint saved! Syncing...', '📥');
+  } catch (err) {
+    console.error('Local save failed', err);
+  }
+
+  // Try backend
+  try {
+    const res = await fetch('/api/remarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(complaintData)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Complaint submitted! We will respond within 24 hours.', '✅');
+    } else {
+      showToast('Complaint saved locally. Admin will be notified.', '📋');
+    }
+  } catch (err) {
+    showToast('Complaint saved locally. Will sync when online.', '📋');
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Complaint ⚠️'; }
+    e.target.reset();
+  }
+}
+
 // ---- Page Navigation ----
 function showPage(page, addToHistory = true) {
   if (addToHistory && currentPage && page !== currentPage) {
@@ -156,14 +365,20 @@ function showPage(page, addToHistory = true) {
     if (lastPage !== page) navigationHistory.push(currentPage);
   }
   currentPage = page;
-  ['home-page','login-page','register-page','admin-login-page','user-dashboard','admin-dashboard'].forEach(id => {
+  ['home-page','about-us-page','login-page','register-page','admin-login-page','user-dashboard','admin-dashboard'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
   const map = {
-    'home': 'home-page', 'user-login': 'login-page', 'user-register': 'register-page',
-    'user-admin-login': 'admin-login-page', 'user-dashboard': 'user-dashboard', 'admin-dashboard': 'admin-dashboard'
+    'home': 'home-page',
+    'about-us': 'about-us-page',
+    'user-login': 'login-page',
+    'user-register': 'register-page',
+    'user-admin-login': 'admin-login-page',
+    'user-dashboard': 'user-dashboard',
+    'admin-dashboard': 'admin-dashboard'
   };
   if (map[page]) document.getElementById(map[page])?.classList.remove('hidden');
+  if (page === 'home') updateNotifications();
   if (page === 'user-admin-login') loadAdminCredentials();
   if (page === 'admin-dashboard') {
     updateAllStats(); updateUsersTable(); updateActivityTimeline();
@@ -183,7 +398,7 @@ function showUserSection(section) {
   });
   document.getElementById(`user-section-${section}`)?.classList.remove('hidden');
   document.querySelector(`.user-nav-item[data-section="${section}"]`)?.classList.add('bg-emerald-600');
-  if (section === 'dashboard') updateDashboardPrices();
+  if (section === 'dashboard') { updateDashboardPrices(); updateMarketsAvailableCount(); }
 }
 
 function showAdminSection(section) {
@@ -663,6 +878,8 @@ function initDataChart() {
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   showPage('home', false);
+  updateNotifications();
+  updateMarketsAvailableCount();
   // Load activities from localStorage fallback
   try {
     const stored = localStorage.getItem('agripredictactivities');
